@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Permite build sem banco de dados conectado (modo offline)
+  typescript: {
+    ignoreBuildErrors: false,
+  },
 };
 
 export default nextConfig;
