@@ -7,11 +7,15 @@ import { prisma } from './db';
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    // Login com Google
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
-    }),
+    // Login com Google (só ativo se as credenciais estiverem configuradas)
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? [
+          GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          }),
+        ]
+      : []),
     // Login com email/senha
     CredentialsProvider({
       name: 'credentials',
@@ -20,26 +24,22 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Senha', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
+        if (!credentials?.email || !credentials?.password) return null;
 
         const email = credentials.email as string;
         const password = credentials.password as string;
 
         try {
-          const user = await prisma.user.findUnique({
-            where: { email },
-          });
+          const user = await prisma.user.findUnique({ where: { email } });
 
-          if (!user || !user.password) {
-            return null;
-          }
+          if (!user || !user.password) return null;
 
           const isValid = await bcrypt.compare(password, user.password);
+          if (!isValid) return null;
 
-          if (!isValid) {
-            return null;
+          // Bloqueia login se não aprovado
+          if (user.status === 'REJECTED') {
+            throw new Error('REJECTED');
           }
 
           return {
@@ -47,30 +47,51 @@ export const authOptions: NextAuthOptions = {
             name: user.name,
             email: user.email,
             image: user.image,
+            role: user.role,
+            status: user.status,
           };
-        } catch {
-          // Se o banco de dados não estiver disponível, retorna null
+        } catch (e: unknown) {
+          if (e instanceof Error && e.message === 'REJECTED') throw e;
           return null;
         }
       },
     }),
   ],
   callbacks: {
-    // Adiciona o ID do usuário ao token JWT
+    // Adiciona id, role e status ao token JWT
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.role = (user as { role?: string }).role;
+        token.status = (user as { status?: string }).status;
+      }
+      // Sempre re-busca status do banco para refletir aprovações em tempo real
+      if (token.id) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true, status: true },
+          });
+          if (dbUser) {
+            token.role = dbUser.role;
+            token.status = dbUser.status;
+          }
+        } catch {
+          // mantém valores do token se banco indisponível
+        }
       }
       return token;
     },
-    // Adiciona o ID do usuário à sessão
+    // Expõe id, role e status na sessão
     async session({ session, token }) {
-      if (session.user && token.id) {
+      if (session.user) {
         session.user.id = token.id as string;
+        session.user.role = token.role as string;
+        session.user.status = token.status as string;
       }
       return session;
     },
-    // Cria usuário no banco ao fazer login com Google
+    // Cria usuário no banco ao fazer login com Google; bloqueia se REJECTED
     async signIn({ user, account }) {
       if (account?.provider === 'google' && user.email) {
         try {
@@ -84,11 +105,18 @@ export const authOptions: NextAuthOptions = {
                 email: user.email,
                 name: user.name,
                 image: user.image,
+                status: 'PENDING',
+                role: 'USER',
               },
             });
+            // Redireciona para pending após registro via Google
+            return '/pending';
           }
+
+          if (existing.status === 'REJECTED') return false;
+          if (existing.status === 'PENDING') return '/pending';
         } catch {
-          // Se o banco não estiver disponível, permite login mas sem persistência
+          // Permite login mas sem persistência se banco indisponível
         }
       }
       return true;
