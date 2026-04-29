@@ -57,23 +57,26 @@ export async function POST(request: Request) {
     // Gerar hash da senha com bcrypt (10 rounds)
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Criar usuário no banco de dados
+    // Criar usuário no banco de dados (status PENDING até aprovação do admin)
     await prisma.user.create({
       data: {
         name: name.trim(),
         email: email.toLowerCase(),
         password: hashedPassword,
+        role: 'USER',
+        status: 'PENDING',
       },
     });
 
     return NextResponse.json(
-      { success: true, message: 'Conta criada com sucesso' },
+      { success: true, message: 'Conta criada! Aguarde a aprovação do administrador.' },
       { status: 201 }
     );
   } catch (error) {
-    console.error('Erro ao registrar usuário:', error);
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Erro ao registrar usuário:', msg);
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { error: 'Erro interno do servidor', detail: msg },
       { status: 500 }
     );
   }
