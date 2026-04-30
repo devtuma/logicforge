@@ -73,6 +73,15 @@ function CloseIcon() {
   );
 }
 
+/** Ícone de Admin (escudo) */
+function AdminIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
 /** Item de navegação da sidebar */
 function NavItem({
   href,
@@ -109,6 +118,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/projects/new')) return 'Novo Projeto';
   if (pathname.startsWith('/projects/')) return 'Editor de Projeto';
   if (pathname === '/settings') return 'Configurações';
+  if (pathname === '/admin') return 'Painel Admin';
   return 'LogicForge';
 }
 
@@ -177,6 +187,15 @@ export default function DashboardLayout({
             active={pathname === '/settings'}
             onClick={() => setSidebarOpen(false)}
           />
+          {session?.user?.role === 'ADMIN' && (
+            <NavItem
+              href="/admin"
+              icon={<AdminIcon />}
+              label="Painel Admin"
+              active={pathname === '/admin'}
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
         </nav>
 
         {/* Separador */}
