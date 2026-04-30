@@ -162,23 +162,22 @@ PADRAO 6 -- CONTADOR (contar pulsos ate N)
   Explicacao: CTU conta bordas de subida em IN; quando CV>=PV=10, Q=1.
 
 ===============================================
-LIMITE TECNICO DE ENTRADAS -- EXPLICACAO
+LIMITE DE ENTRADAS E SAIDAS
 ===============================================
-O LIMITE DE 4 ENTRADAS e uma restricao tecnica REAL do Mapa de Karnaugh:
-  - 4 entradas = 2^4 = 16 linhas na tabela verdade (renderizavel)
-  - 5 entradas = 2^5 = 32 linhas (Karnaugh nao suporta, expressao fica enorme)
-  - 8 entradas = 2^8 = 256 linhas (impraticavel no Karnaugh)
-  - 20 entradas = 2^20 = 1.048.576 linhas (impossivel renderizar)
+ENTRADAS: voce pode usar ate 12 entradas!
+  - 1 a 4 entradas: Tabela Verdade + Mapa de Karnaugh + Expressoes + Ladder (tudo funciona)
+  - 5 a 12 entradas: Tabela Verdade + Expressoes + Ladder (Karnaugh e colapsado automaticamente)
+  - O usuario decide se quer abrir o Karnaugh colapsado clicando no titulo da secao
+  - Nao limite a 4 entradas -- use quantas o cenario precisar (max 12)
 
-SAIDAS: NAO HA LIMITE PRATICO. Voce pode usar ate 12 saidas!
-  - Para sistemas AGV com muitos estados: use todas as 12 saidas
-  - Cada saida representa uma permissao, flag ou comando independente
-  - As saidas compartilham as mesmas 4 entradas mas cada uma tem sua propria formula booleana
+SAIDAS: voce pode usar ate 12 saidas!
+  - Cada saida = uma bobina, permissao, flag ou comando independente
+  - Para sistemas AGV, conveyors e multiplos atuadores: aproveite todas as 12 saidas
 
-ESTRATEGIA PARA MAIS DE 4 ENTRADAS:
-  - Combine condicoes compostas em UMA entrada fisica quando logicamente equivalente
-  - Exemplo: SEN_250_251_OCUP = (SEN_250 OR SEN_251) -- trata como 1 entrada no CLP
-  - Explique essa combinacao ao usuario ANTES de chamar a ferramenta
+ESTRATEGIA PARA MUITAS ENTRADAS:
+  - Use entradas que sao diretamente sensores fisicos ou botoes do painel
+  - Combine apenas quando duas condicoes sao inseparaveis: SEN_250_251 = (SEN_250 OR SEN_251)
+  - Explique a combinacao ao usuario depois de chamar a ferramenta
 
 ===============================================
 ERROS A EVITAR
@@ -203,7 +202,7 @@ const logicMatrixTool = tool({
     variables: z.array(z.object({
       name: z.string().describe('Nome curto sem espaços (ex: BTN_LIB, SS_PORTA, FC_ALT)'),
       description: z.string().describe('Descrição física (ex: Sensor fim de curso da talha)')
-    })).min(1).max(4).describe('De 1 a 4 variáveis de entrada. LIMITE TECNICO: o Mapa de Karnaugh so suporta ate 4 variaveis (2^4=16 linhas).'),
+    })).min(1).max(12).describe('De 1 a 12 variáveis de entrada. Para mais de 4, o Mapa de Karnaugh sera colapsado (nao renderizado) mas a Tabela Verdade, Expressoes e Ladder continuam funcionando normalmente.'),
     outputs: z.array(z.object({
       name: z.string().describe('Nome da saída (ex: DESCE_TALHA, AVANCA_EOM, PERM_EXOTICO_SAIR)'),
       description: z.string().describe('O que a saída faz (ex: Aciona descida da talha)'),

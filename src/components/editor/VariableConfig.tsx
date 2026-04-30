@@ -35,14 +35,14 @@ export function VariableConfig({
   const hasEmptyOutputName = outputs.some((o) => !o.name.trim());
   const isValid = !hasEmptyVarName && !hasEmptyOutputName && numVars >= 2 && numOutputs >= 1;
 
-  /** Altera a quantidade de variáveis (2-4) */
+  /** Altera a quantidade de variáveis (2-12) */
   function handleVarCountChange(delta: number) {
-    const newCount = Math.max(2, Math.min(4, numVars + delta));
+    const newCount = Math.max(2, Math.min(12, numVars + delta));
     if (newCount === numVars) return;
 
     if (newCount > numVars) {
-      // Adicionar variáveis com nomes padrão
-      const defaults = ['A', 'B', 'C', 'D'];
+      // Adicionar variáveis com nomes padrão A-L
+      const defaults = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
       const newVars = [...variables];
       for (let i = numVars; i < newCount; i++) {
         newVars.push({ name: defaults[i] || `X${i}`, description: '' });
@@ -54,9 +54,9 @@ export function VariableConfig({
     }
   }
 
-  /** Altera a quantidade de saídas (1-4) */
+  /** Altera a quantidade de saídas (1-12) */
   function handleOutputCountChange(delta: number) {
-    const newCount = Math.max(1, Math.min(4, numOutputs + delta));
+    const newCount = Math.max(1, Math.min(12, numOutputs + delta));
     if (newCount === numOutputs) return;
 
     if (newCount > numOutputs) {
@@ -118,11 +118,16 @@ export function VariableConfig({
               variant="secondary"
               size="sm"
               onClick={() => handleVarCountChange(1)}
-              disabled={numVars >= 4}
+              disabled={numVars >= 12}
               aria-label="Adicionar variável"
             >
               +
             </Button>
+            {numVars > 4 && (
+              <span className="ml-2 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                ⚠️ Karnaugh colapsado (&gt;4 vars)
+              </span>
+            )}
           </div>
         </div>
 
@@ -177,7 +182,7 @@ export function VariableConfig({
               variant="secondary"
               size="sm"
               onClick={() => handleOutputCountChange(1)}
-              disabled={numOutputs >= 4}
+              disabled={numOutputs >= 12}
               aria-label="Adicionar saída"
             >
               +

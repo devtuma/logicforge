@@ -3,7 +3,7 @@
 // Componente principal do editor de projeto
 // Orquestra todas as seções: configuração, tabela verdade, mapa de Karnaugh, expressão e exportação
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ProjectData, CellValue, Variable, OutputConfig } from '@/lib/engine/types';
 import { useTruthTable } from '@/hooks/useTruthTable';
 import { useSimplification } from '@/hooks/useSimplification';
@@ -30,6 +30,7 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
   const [projectName, setProjectName] = useState(initialData?.name || 'Novo_Projeto_LF');
   const [diagramMode, setDiagramMode] = useState<'ladder' | 'fbd'>('ladder');
   const [inputTab, setInputTab] = useState<'ai' | 'st' | 'manual'>('ai');
+  const [karnaughOpen, setKarnaughOpen] = useState(true);
   
   const {
     variables,
@@ -219,15 +220,52 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
             />
           )}
 
-          {/* Mapa de Karnaugh */}
-          <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
-            <KarnaughMap
-              numVars={variables.length}
-              varNames={varNames}
-              values={outputs[activeOutputIndex]?.values || []}
-              groups={activeSimplification?.groups || []}
-              outputName={outputs[activeOutputIndex]?.name || ''}
-            />
+          {/* Mapa de Karnaugh -- gaveta colapsável */}
+          <section className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
+            <button
+              onClick={() => setKarnaughOpen(o => !o)}
+              className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-surface-hover transition-colors"
+            >
+              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                <span className="w-1.5 h-5 rounded-full bg-accent inline-block" />
+                Mapa de Karnaugh
+                {variables.length > 4 && (
+                  <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
+                    ⚠️ Somente tabela verdade para {variables.length} variáveis
+                  </span>
+                )}
+              </h2>
+              <span className="text-muted text-lg select-none transition-transform duration-200" style={{ transform: karnaughOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                ∨
+              </span>
+            </button>
+
+            {karnaughOpen && (
+              <div className="px-6 pb-6">
+                {variables.length > 4 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center text-muted gap-3">
+                    <svg className="h-12 w-12 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                    </svg>
+                    <p className="text-sm font-medium">
+                      Mapa de Karnaugh requer no máximo 4 variáveis.
+                    </p>
+                    <p className="text-xs max-w-xs">
+                      Com {variables.length} variáveis há {Math.pow(2, variables.length).toLocaleString()} combinações — impossível num mapa 2D.
+                      As expressões booleanas e o diagrama Ladder continuam disponíveis abaixo.
+                    </p>
+                  </div>
+                ) : (
+                  <KarnaughMap
+                    numVars={variables.length}
+                    varNames={varNames}
+                    values={outputs[activeOutputIndex]?.values || []}
+                    groups={activeSimplification?.groups || []}
+                    outputName={outputs[activeOutputIndex]?.name || ''}
+                  />
+                )}
+              </div>
+            )}
           </section>
 
           {/* Expressão simplificada */}
