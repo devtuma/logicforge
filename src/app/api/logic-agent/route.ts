@@ -1,4 +1,4 @@
-import { streamText, convertToModelMessages, tool } from 'ai';
+import { streamText, tool } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { google } from '@ai-sdk/google';
 import { anthropic } from '@ai-sdk/anthropic';
@@ -158,11 +158,9 @@ export async function POST(req: Request) {
   const { messages } = await req.json();
 
   try {
-    const modelMessages = await convertToModelMessages(messages);
-
     const result = streamText({
       model: getModel(),
-      messages: modelMessages,
+      messages: messages,
       system: SYSTEM_PROMPT,
       tools: { generate_logic_matrix: logicMatrixTool },
       // Sem maxSteps — um único step com tool call, processado no frontend
