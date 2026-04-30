@@ -162,14 +162,35 @@ PADRAO 6 -- CONTADOR (contar pulsos ate N)
   Explicacao: CTU conta bordas de subida em IN; quando CV>=PV=10, Q=1.
 
 ===============================================
+LIMITE TECNICO DE ENTRADAS -- EXPLICACAO
+===============================================
+O LIMITE DE 4 ENTRADAS e uma restricao tecnica REAL do Mapa de Karnaugh:
+  - 4 entradas = 2^4 = 16 linhas na tabela verdade (renderizavel)
+  - 5 entradas = 2^5 = 32 linhas (Karnaugh nao suporta, expressao fica enorme)
+  - 8 entradas = 2^8 = 256 linhas (impraticavel no Karnaugh)
+  - 20 entradas = 2^20 = 1.048.576 linhas (impossivel renderizar)
+
+SAIDAS: NAO HA LIMITE PRATICO. Voce pode usar ate 12 saidas!
+  - Para sistemas AGV com muitos estados: use todas as 12 saidas
+  - Cada saida representa uma permissao, flag ou comando independente
+  - As saidas compartilham as mesmas 4 entradas mas cada uma tem sua propria formula booleana
+
+ESTRATEGIA PARA MAIS DE 4 ENTRADAS:
+  - Combine condicoes compostas em UMA entrada fisica quando logicamente equivalente
+  - Exemplo: SEN_250_251_OCUP = (SEN_250 OR SEN_251) -- trata como 1 entrada no CLP
+  - Explique essa combinacao ao usuario ANTES de chamar a ferramenta
+
+===============================================
 ERROS A EVITAR
 ===============================================
-- NAO crie entradas "virtuais" como TON_X=1 para representar a saida de outro temporizador -- a tabela verdade so aceita entradas fisicas reais.
-- NAO recuse pedidos de tempo. Sempre e possivel representar como TON/TOF/CTU.
-- NAO crie mais de 4 entradas mesmo que o usuario mencione mais.
-- NAO repita tentativas similares quando o usuario corrigir -- mude a abordagem radicalmente.
+- NUNCA recuse o pedido. SEMPRE decomponha e chame a ferramenta.
+- NAO crie entradas "virtuais" como saidas de outros blocos -- apenas sensores fisicos.
+- NAO crie mais de 4 entradas -- e um limite REAL do motor Karnaugh, nao uma escolha.
+- APROVEITE as 12 saidas disponiveis para modelar todos os estados e permissoes.
+- NAO repita a mesma abordagem se o usuario corrigir -- mude radicalmente.
 
-Se a descricao for interpretavel, chame a ferramenta de imediato. Responda apenas em texto quando o usuario estiver corrigindo ou pedindo explicacao.`;
+Se a descricao for interpretavel (mesmo que parcialmente), chame a ferramenta imediatamente.
+Explique o que foi simplificado DEPOIS de chamar a ferramenta.`;
 
 // ============================================================
 // TOOL SCHEMA — Client-side tool (sem execute)
@@ -182,12 +203,12 @@ const logicMatrixTool = tool({
     variables: z.array(z.object({
       name: z.string().describe('Nome curto sem espaços (ex: BTN_LIB, SS_PORTA, FC_ALT)'),
       description: z.string().describe('Descrição física (ex: Sensor fim de curso da talha)')
-    })).min(1).max(4).describe('De 1 a 4 variáveis de entrada.'),
+    })).min(1).max(4).describe('De 1 a 4 variáveis de entrada. LIMITE TECNICO: o Mapa de Karnaugh so suporta ate 4 variaveis (2^4=16 linhas).'),
     outputs: z.array(z.object({
-      name: z.string().describe('Nome da saída (ex: DESCE_TALHA, AVANCA_EOM)'),
+      name: z.string().describe('Nome da saída (ex: DESCE_TALHA, AVANCA_EOM, PERM_EXOTICO_SAIR)'),
       description: z.string().describe('O que a saída faz (ex: Aciona descida da talha)'),
       formula: z.string().describe('Expressão booleana legível (ex: BTN_LIB AND SS_PORTA)')
-    })).min(1).max(4).describe('De 1 a 4 saídas.'),
+    })).min(1).max(12).describe('De 1 a 12 saidas. Para sistemas complexos como AGVs, use multiplas saidas para cobrir todos os estados.'),
     truthTable: z.array(z.object({
       outputName: z.string().describe('Nome da saída correspondente'),
       activeRows: z.array(z.array(z.number().int().min(0).max(1)))
