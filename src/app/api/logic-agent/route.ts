@@ -160,19 +160,44 @@ const logicMatrixTool = tool({
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  // Limpa mensagens para o formato CoreMessage estrito para evitar erros de validação
-  const coreMessages = (messages || []).map((msg: any) => {
-    const coreMsg: any = { role: msg.role, content: msg.content || '' };
-    if (msg.toolInvocations) {
-      coreMsg.toolCalls = msg.toolInvocations.map((t: any) => ({
-        type: 'tool-call',
-        toolCallId: t.toolCallId,
-        toolName: t.toolName,
-        args: t.args,
-      }));
-    }
-    return coreMsg;
-  });
+  // Converte UIMessage[] (do frontend) para CoreMessage[] (para streamText)
+  // O frontend envia mensagens com estrutura {id, role, parts, content, ...}
+  // O streamText espera {role, content} onde content é string ou Part[]
+  const coreMessages = (messages || [])
+    .filter((msg: any) => msg.role === 'user' || msg.role === 'assistant')
+    .map((msg: any) => {
+      // Extrair texto do campo parts (UIMessage v6) ou do campo content (fallback)
+      if (msg.role === 'user') {
+        let text = '';
+        if (msg.parts && Array.isArray(msg.parts)) {
+          text = msg.parts
+            .filter((p: any) => p.type === 'text')
+            .map((p: any) => p.text || '')
+            .join('\n');
+        }
+        if (!text && typeof msg.content === 'string') {
+          text = msg.content;
+        }
+        return { role: 'user' as const, content: text };
+      }
+
+      // Assistant: extrair texto das parts
+      if (msg.role === 'assistant') {
+        let text = '';
+        if (msg.parts && Array.isArray(msg.parts)) {
+          text = msg.parts
+            .filter((p: any) => p.type === 'text')
+            .map((p: any) => p.text || '')
+            .join('\n');
+        }
+        if (!text && typeof msg.content === 'string') {
+          text = msg.content;
+        }
+        return { role: 'assistant' as const, content: text || '...' };
+      }
+
+      return { role: msg.role, content: msg.content || '' };
+    });
 
   try {
     const result = streamText({
