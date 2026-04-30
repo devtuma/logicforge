@@ -4,7 +4,8 @@ import { google } from '@ai-sdk/google';
 import { anthropic } from '@ai-sdk/anthropic';
 import { z } from 'zod';
 
-export const maxDuration = 60;
+export const runtime = 'edge';
+export const maxDuration = 30;
 
 // ============================================================
 // SELEÇÃO DO PROVEDOR DE IA
