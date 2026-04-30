@@ -132,6 +132,9 @@ export function findKmapGroups(
   implicants: Implicant[],
   numVars: number
 ): KmapGroup[] {
+  // Mapa de Karnaugh só suporta até 4 variáveis — para mais, retorna vazio sem crashar
+  if (numVars > 4) return [];
+
   const layout = getKmapLayout(numVars);
   const groups: KmapGroup[] = [];
 

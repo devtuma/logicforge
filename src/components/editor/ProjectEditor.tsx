@@ -31,6 +31,7 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
   const [diagramMode, setDiagramMode] = useState<'ladder' | 'fbd'>('ladder');
   const [inputTab, setInputTab] = useState<'ai' | 'st' | 'manual'>('ai');
   const [karnaughOpen, setKarnaughOpen] = useState(true);
+  const [truthTableOpen, setTruthTableOpen] = useState(true);
   
   const {
     variables,
@@ -75,6 +76,8 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
     setVariables(newVars);
     setOutputs(newOuts);
     setTableGenerated(true);
+    // Para muitas variáveis, colapsar a tabela verdade por padrão (ocupa muito espaço)
+    setTruthTableOpen(newVars.length <= 4);
     // Sincronizar aba ativa com a primeira saída gerada
     if (newOuts.length > 0) {
       setActiveOutputTab(newOuts[0].name);
@@ -197,97 +200,7 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
       {/* === Resultados (visíveis após gerar tabela) === */}
       {tableGenerated && outputs[0]?.values.length > 0 && (
         <>
-          {/* Tabela Verdade */}
-          <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
-            <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
-              <span className="w-1.5 h-5 rounded-full bg-accent inline-block" />
-              Tabela Verdade
-            </h2>
-            <TruthTable
-              variables={variables}
-              outputs={outputs}
-              ordering={ordering}
-              onOutputChange={handleOutputChange}
-            />
-          </section>
-
-          {/* Abas de saída (só quando múltiplas) */}
-          {outputs.length > 1 && (
-            <OutputTabs
-              outputs={outputs}
-              activeTab={activeOutputTab}
-              onChange={setActiveOutputTab}
-            />
-          )}
-
-          {/* Mapa de Karnaugh -- gaveta colapsável */}
-          <section className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
-            <button
-              onClick={() => setKarnaughOpen(o => !o)}
-              className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-surface-hover transition-colors"
-            >
-              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-                <span className="w-1.5 h-5 rounded-full bg-accent inline-block" />
-                Mapa de Karnaugh
-                {variables.length > 4 && (
-                  <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
-                    ⚠️ Somente tabela verdade para {variables.length} variáveis
-                  </span>
-                )}
-              </h2>
-              <span className="text-muted text-lg select-none transition-transform duration-200" style={{ transform: karnaughOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-                ∨
-              </span>
-            </button>
-
-            {karnaughOpen && (
-              <div className="px-6 pb-6">
-                {variables.length > 4 ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-center text-muted gap-3">
-                    <svg className="h-12 w-12 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                    </svg>
-                    <p className="text-sm font-medium">
-                      Mapa de Karnaugh requer no máximo 4 variáveis.
-                    </p>
-                    <p className="text-xs max-w-xs">
-                      Com {variables.length} variáveis há {Math.pow(2, variables.length).toLocaleString()} combinações — impossível num mapa 2D.
-                      As expressões booleanas e o diagrama Ladder continuam disponíveis abaixo.
-                    </p>
-                  </div>
-                ) : (
-                  <KarnaughMap
-                    numVars={variables.length}
-                    varNames={varNames}
-                    values={outputs[activeOutputIndex]?.values || []}
-                    groups={activeSimplification?.groups || []}
-                    outputName={outputs[activeOutputIndex]?.name || ''}
-                  />
-                )}
-              </div>
-            )}
-          </section>
-
-          {/* Expressão simplificada */}
-          <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
-            {isComputing ? (
-              <div className="flex items-center gap-2 text-sm text-muted">
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Calculando simplificação...
-              </div>
-            ) : (
-              <ExpressionDisplay
-                sopExpression={activeSimplification?.result.expression || '0'}
-                posExpression={activeSimplification?.result.expressionPOS || '0'}
-                outputName={outputs[activeOutputIndex]?.name || ''}
-              />
-            )}
-          </section>
-
-          {/* Diagramas: Ladder + FBD */}
+          {/* Diagramas: Ladder + FBD — mais importante, aparece primeiro */}
           {exportSimplifications.length > 0 && (
             <section className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
               {/* Tab bar dos diagramas */}
@@ -341,6 +254,106 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
               </div>
             </section>
           )}
+
+          {/* Expressão simplificada */}
+          <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+            {isComputing ? (
+              <div className="flex items-center gap-2 text-sm text-muted">
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Calculando simplificação...
+              </div>
+            ) : (
+              <ExpressionDisplay
+                sopExpression={activeSimplification?.result.expression || '0'}
+                posExpression={activeSimplification?.result.expressionPOS || '0'}
+                outputName={outputs[activeOutputIndex]?.name || ''}
+              />
+            )}
+          </section>
+
+          {/* Mapa de Karnaugh — sempre visível, mensagem inline para >4 vars */}
+          <section className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
+            <button
+              onClick={() => setKarnaughOpen(o => !o)}
+              className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-surface-hover transition-colors"
+            >
+              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                <span className="w-1.5 h-5 rounded-full bg-accent inline-block" />
+                Mapa de Karnaugh
+                {variables.length > 4 && (
+                  <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
+                    ⚠️ Requer ≤4 variáveis
+                  </span>
+                )}
+              </h2>
+              <span className="text-muted text-lg select-none" style={{ transform: karnaughOpen ? 'rotate(180deg)' : 'rotate(0deg)', display: 'inline-block', transition: 'transform 0.2s' }}>
+                ∨
+              </span>
+            </button>
+            {karnaughOpen && (
+              <div className="px-6 pb-6">
+                {variables.length > 4 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center text-muted gap-2">
+                    <svg className="h-10 w-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                    </svg>
+                    <p className="text-sm">
+                      Karnaugh requer no máximo 4 variáveis. Com {variables.length} variáveis há {Math.pow(2, variables.length).toLocaleString()} combinações.
+                    </p>
+                  </div>
+                ) : (
+                  <KarnaughMap
+                    numVars={variables.length}
+                    varNames={varNames}
+                    values={outputs[activeOutputIndex]?.values || []}
+                    groups={activeSimplification?.groups || []}
+                    outputName={outputs[activeOutputIndex]?.name || ''}
+                  />
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* Abas de saída (só quando múltiplas) */}
+          {outputs.length > 1 && (
+            <OutputTabs
+              outputs={outputs}
+              activeTab={activeOutputTab}
+              onChange={setActiveOutputTab}
+            />
+          )}
+
+          {/* Tabela Verdade — gaveta colapsável (auto-fecha para muitas variáveis) */}
+          <section className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
+            <button
+              onClick={() => setTruthTableOpen(o => !o)}
+              className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-surface-hover transition-colors"
+            >
+              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                <span className="w-1.5 h-5 rounded-full bg-accent inline-block" />
+                Tabela Verdade
+                <span className="text-xs font-normal text-muted">
+                  ({Math.pow(2, variables.length).toLocaleString()} linhas × {outputs.length} saídas)
+                </span>
+              </h2>
+              <span className="text-muted text-lg select-none" style={{ transform: truthTableOpen ? 'rotate(180deg)' : 'rotate(0deg)', display: 'inline-block', transition: 'transform 0.2s' }}>
+                ∨
+              </span>
+            </button>
+            {truthTableOpen && (
+              <div className="px-6 pb-6">
+                <TruthTable
+                  variables={variables}
+                  outputs={outputs}
+                  ordering={ordering}
+                  onOutputChange={handleOutputChange}
+                />
+              </div>
+            )}
+          </section>
 
           {/* Exportação */}
           <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
