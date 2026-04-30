@@ -9,12 +9,12 @@ export default withAuth(
     // Rotas do admin: só ADMIN
     if (pathname.startsWith('/admin')) {
       if (token?.role !== 'ADMIN') {
-        return NextResponse.redirect(new URL('/dashboard', req.url));
+        return NextResponse.redirect(new URL('/projects', req.url));
       }
     }
 
     // Dashboard: só APPROVED (ou ADMIN)
-    if (pathname.startsWith('/dashboard')) {
+    if (pathname.startsWith('/projects') || pathname.startsWith('/settings')) {
       if (token?.status !== 'APPROVED' && token?.role !== 'ADMIN') {
         return NextResponse.redirect(new URL('/pending', req.url));
       }
@@ -30,5 +30,5 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*'],
+  matcher: ['/projects/:path*', '/settings/:path*', '/admin/:path*'],
 };

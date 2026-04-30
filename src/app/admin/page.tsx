@@ -112,8 +112,8 @@ export default function AdminPage() {
             <h1 className="admin-title">⚙️ Painel Admin</h1>
             <p className="admin-subtitle">Gerencie o acesso dos usuários ao LogicForge</p>
           </div>
-          <button className="admin-back-btn" onClick={() => router.push('/dashboard')}>
-            ← Dashboard
+          <button className="admin-back-btn" onClick={() => router.push('/projects')}>
+            ← Projetos
           </button>
         </div>
 
