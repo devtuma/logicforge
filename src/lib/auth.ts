@@ -60,19 +60,18 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     // Adiciona id, role e status ao token JWT
     async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.role = (user as { role?: string }).role;
-        token.status = (user as { status?: string }).status;
+      if (user?.email) {
+        token.email = user.email;
       }
-      // Sempre re-busca status do banco para refletir aprovações em tempo real
-      if (token.id) {
+      // Busca usuário pelo email para garantir que temos o ID e status corretos do banco
+      if (token.email) {
         try {
           const dbUser = await prisma.user.findUnique({
-            where: { id: token.id as string },
-            select: { role: true, status: true },
+            where: { email: token.email as string },
+            select: { id: true, role: true, status: true },
           });
           if (dbUser) {
+            token.id = dbUser.id;
             token.role = dbUser.role;
             token.status = dbUser.status;
           }
