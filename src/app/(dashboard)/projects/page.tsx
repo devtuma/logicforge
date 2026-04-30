@@ -14,19 +14,32 @@ interface ProjectSummary {
   updatedAt: string;
 }
 
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+
 /** Tenta buscar projetos da API interna */
 async function fetchProjects(): Promise<ProjectSummary[] | null> {
   try {
-    // Em ambiente de desenvolvimento sem banco, retorna null para exibir fallback
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-    const res = await fetch(`${baseUrl}/api/projects`, {
-      cache: 'no-store',
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return null;
+
+    const projects = await prisma.project.findMany({
+      where: { userId: session.user.id },
+      include: { outputs: true },
+      orderBy: { updatedAt: 'desc' },
     });
 
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    // Sem conexão com API — modo fallback
+    return projects.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description || '',
+      variableCount: Array.isArray(p.variables) ? p.variables.length : 0,
+      outputCount: p.outputs?.length || 0,
+      updatedAt: p.updatedAt.toISOString(),
+    }));
+  } catch (error) {
+    console.error('Erro no fetchProjects:', error);
     return null;
   }
 }

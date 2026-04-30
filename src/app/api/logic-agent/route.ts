@@ -160,10 +160,24 @@ const logicMatrixTool = tool({
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
+  // Limpa mensagens para o formato CoreMessage estrito para evitar erros de validação
+  const coreMessages = (messages || []).map((msg: any) => {
+    const coreMsg: any = { role: msg.role, content: msg.content || '' };
+    if (msg.toolInvocations) {
+      coreMsg.toolCalls = msg.toolInvocations.map((t: any) => ({
+        type: 'tool-call',
+        toolCallId: t.toolCallId,
+        toolName: t.toolName,
+        args: t.args,
+      }));
+    }
+    return coreMsg;
+  });
+
   try {
     const result = streamText({
       model: getModel(),
-      messages: messages,
+      messages: coreMessages,
       system: SYSTEM_PROMPT,
       tools: { generate_logic_matrix: logicMatrixTool },
       // Sem maxSteps — um único step com tool call, processado no frontend
