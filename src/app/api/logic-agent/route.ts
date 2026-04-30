@@ -11,24 +11,27 @@ export const maxDuration = 60;
 // ============================================================
 type AIProvider = 'openai' | 'google' | 'anthropic';
 
-const AI_PROVIDER: AIProvider = (process.env.AI_PROVIDER as AIProvider) || 'openai';
+const rawProvider = (process.env.AI_PROVIDER || 'openai').toLowerCase().replace(/['"]/g, '').trim();
+const AI_PROVIDER: AIProvider = (['openai', 'google', 'anthropic'].includes(rawProvider) ? rawProvider : 'openai') as AIProvider;
 
 function getModel() {
   switch (AI_PROVIDER) {
-    case 'openai':
-      return openai.chat('gpt-4o-mini');
     case 'google':
       return google('gemini-2.5-flash');
     case 'anthropic':
       return anthropic('claude-sonnet-4-20250514');
+    case 'openai':
+    default:
+      return openai.chat('gpt-4o-mini');
   }
 }
 
 function getKeyName(): string {
   switch (AI_PROVIDER) {
-    case 'openai': return 'OPENAI_API_KEY';
     case 'google': return 'GOOGLE_GENERATIVE_AI_API_KEY';
     case 'anthropic': return 'ANTHROPIC_API_KEY';
+    case 'openai':
+    default: return 'OPENAI_API_KEY';
   }
 }
 
