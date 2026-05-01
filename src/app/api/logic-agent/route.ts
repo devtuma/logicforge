@@ -215,23 +215,24 @@ Explique o que foi simplificado DEPOIS de chamar a ferramenta.`;
 // ============================================================
 const logicMatrixTool = tool({
   description: 'Preenche automaticamente a Tabela Verdade, Mapa de Karnaugh, Expressões e Diagrama Ladder no LogicForge. SEMPRE chame esta ferramenta.',
-  // Na nova API do AI SDK v4+, o campo é inputSchema (antes era parameters)
   inputSchema: z.object({
     commentary: z.string().describe('Resumo de 1-2 frases do que foi projetado.'),
     variables: z.array(z.object({
       name: z.string().describe('Nome curto sem espaços (ex: BTN_LIB, SS_PORTA, FC_ALT)'),
       description: z.string().describe('Descrição física (ex: Sensor fim de curso da talha)')
-    })).min(1).max(12).describe('De 1 a 12 variáveis de entrada. Para mais de 4, o Mapa de Karnaugh sera colapsado (nao renderizado) mas a Tabela Verdade, Expressoes e Ladder continuam funcionando normalmente.'),
+    })).min(1).max(12).describe('De 1 a 12 variáveis de entrada.'),
     outputs: z.array(z.object({
       name: z.string().describe('Nome da saída (ex: DESCE_TALHA, AVANCA_EOM, PERM_EXOTICO_SAIR)'),
       description: z.string().describe('O que a saída faz (ex: Aciona descida da talha)'),
-      formula: z.string().describe('Expressão booleana legível (ex: BTN_LIB AND SS_PORTA)')
-    })).min(1).max(12).describe('De 1 a 12 saidas. Para sistemas complexos como AGVs, use multiplas saidas para cobrir todos os estados.'),
-    truthTable: z.array(z.object({
-      outputName: z.string().describe('Nome da saída correspondente'),
-      activeRows: z.array(z.array(z.number().int().min(0).max(1)))
-        .describe('Array de linhas (combinações de bits) em que a saída é 1. Cada sub-array tem exatamente N bits (N = número de variáveis). Ex: se 3 variáveis, [1,0,1] significa Var1=1, Var2=0, Var3=1.')
-    })).describe('Para cada saída, as combinações de entrada que ativam (saída=1).')
+      formula: z.string().describe(
+        'Expressão booleana COMPLETA usando os nomes exatos das variáveis. ' +
+        'Operadores: AND, OR, NOT, parênteses. ' +
+        'Exemplo com 3 vars (IN_A, IN_B, IN_C): "(IN_A AND NOT IN_B) OR IN_C". ' +
+        'IMPORTANTE: use APENAS os nomes de variáveis declarados no campo variables. ' +
+        'Não use abreviações nem nomes diferentes. ' +
+        'Para saídas constantes use "0" ou "1".'
+      )
+    })).min(1).max(12).describe('De 1 a 12 saidas. A tabela verdade será gerada automaticamente avaliando as fórmulas.'),
   }),
   // SEM execute — é um client-side tool processado pelo frontend
 });

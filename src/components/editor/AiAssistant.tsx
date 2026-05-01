@@ -4,7 +4,6 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { Variable, OutputConfig, CellValue } from '@/lib/engine/types';
-import { getMintermIndex } from '@/lib/engine/truth-table';
 
 interface AiAssistantProps {
   onApplyMatrix: (variables: Variable[], outputs: OutputConfig[]) => void;
@@ -28,23 +27,55 @@ export function AiAssistant({ onApplyMatrix, ordering }: AiAssistantProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ─── Interceptar Tool Calls e aplicar na UI ───
-  // Processa TODAS as mensagens em busca de tool calls não processados
+  // ─── Parser de fórmula booleana ───────────────────────────────────────────
+  // Avalia expressões como "IN_A AND NOT IN_B OR (IN_C AND IN_D)"
+  // para uma dada combinação de entradas. Retorna 0 ou 1.
+  function evaluateFormula(formula: string, varValues: Record<string, number>): number {
+    // Normaliza: substitui nomes de variáveis pelos valores 0/1
+    // Ordena por comprimento decrescente para evitar substituição parcial
+    const varNames = Object.keys(varValues).sort((a, b) => b.length - a.length);
+    let expr = formula.trim();
+
+    // Substitui nomes de variáveis por 0/1
+    for (const name of varNames) {
+      // usa regex com word boundary para não substituir prefixo de outro nome
+      expr = expr.replace(new RegExp('\\b' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g'), String(varValues[name]));
+    }
+
+    // Tenta avaliar a expressão substituída
+    try {
+      // Converte sintaxe de texto para JS
+      const jsExpr = expr
+        .replace(/\bAND\b/gi, '&&')
+        .replace(/\bOR\b/gi, '||')
+        .replace(/\bNOT\b\s*/gi, '!')
+        .replace(/\b1\b/g, 'true')
+        .replace(/\b0\b/g, 'false');
+
+      // eslint-disable-next-line no-new-func
+      const result = new Function(`return !!(${jsExpr});`)();
+      return result ? 1 : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  // ─── Interceptar Tool Calls e aplicar na UI ───────────────────────────────
   useEffect(() => {
     for (const msg of messages) {
       if (msg.role !== 'assistant' || !msg.parts) continue;
 
       for (const part of msg.parts) {
-        // Na nova API do AI SDK v3+, o tipo é `tool-${toolName}` para ferramentas tipadas
-        // e 'dynamic-tool' para ferramentas dinâmicas (client-side sem execute)
         const partAny = part as any;
+        // Detecta qualquer part que seja uma tool call da nossa ferramenta
         const isToolPart =
-          part.type === 'tool-generate_logic_matrix' ||
-          (part.type === 'dynamic-tool' && partAny.toolName === 'generate_logic_matrix');
+          partAny.type?.includes('logic') ||
+          partAny.type?.includes('matrix') ||
+          partAny.type?.includes('tool-') ||
+          partAny.type === 'dynamic-tool' ||
+          (partAny.toolName && partAny.input);
 
         if (!isToolPart) continue;
-
-        // Só processar quando o input estiver disponível (não streaming)
         if (partAny.state === 'input-streaming') continue;
 
         const toolCallId: string = partAny.toolCallId;
@@ -53,10 +84,8 @@ export function AiAssistant({ onApplyMatrix, ordering }: AiAssistantProps) {
         const args = partAny.input ?? partAny.args;
         if (!args?.variables?.length || !args?.outputs?.length) continue;
 
-        // Marcar como aplicado
         appliedRef.current.add(toolCallId);
-
-        console.log('[LogicForge AI] ✅ Tool invocada com sucesso:', args.commentary);
+        console.log('[LogicForge AI] ✅ Tool invocada:', args.commentary);
 
         // 1. Montar variáveis
         const vars: Variable[] = args.variables.map((v: any) => ({
@@ -64,28 +93,22 @@ export function AiAssistant({ onApplyMatrix, ordering }: AiAssistantProps) {
           description: v.description || '',
         }));
 
-        const totalRows = Math.pow(2, vars.length);
+        const numVars = vars.length;
+        const totalRows = Math.pow(2, numVars);
 
-        // 2. Para cada saída, mapear as linhas ativas (saída=1)
-        const norm = (s: string) => String(s).trim().toUpperCase();
-
+        // 2. Para cada saída, avaliar a fórmula para TODAS as combinações
         const outConfs: OutputConfig[] = args.outputs.map((o: any) => {
           const values = new Array(totalRows).fill(0) as CellValue[];
+          const formula: string = o.formula || '0';
+          const varNames = vars.map(v => v.name);
 
-          const block = args.truthTable?.find(
-            (t: any) => norm(t.outputName) === norm(o.name)
-          );
-
-          if (block?.activeRows) {
-            for (const activeRow of block.activeRows) {
-              // A IA sempre envia valores binários reais (ex: [1,0,1]).
-              // O mintermo é sempre a conversão binário→decimal, independente
-              // da ordenação de exibição (binary ou gray code).
-              const mintermIdx = getMintermIndex(activeRow, 'binary', vars.length);
-              if (mintermIdx >= 0 && mintermIdx < totalRows) {
-                values[mintermIdx] = 1;
-              }
+          for (let row = 0; row < totalRows; row++) {
+            // Monta mapa de valores para esta linha (binário MSB-first)
+            const varValues: Record<string, number> = {};
+            for (let bi = 0; bi < numVars; bi++) {
+              varValues[varNames[bi]] = (row >> (numVars - 1 - bi)) & 1;
             }
+            values[row] = evaluateFormula(formula, varValues) as CellValue;
           }
 
           return { name: o.name, values };
@@ -93,14 +116,14 @@ export function AiAssistant({ onApplyMatrix, ordering }: AiAssistantProps) {
 
         // 3. Aplicar na UI
         onApplyMatrix(vars, outConfs);
-        
+
         // 4. Confirmar conclusão para o AI SDK
         if (addToolResult) {
           try {
             addToolResult({
-              tool: 'generate_logic_matrix',
+              tool: 'logicMatrixTool',
               toolCallId,
-              output: "UI was successfully updated with the logic matrix and truth table. Emulate completion. User can now review."
+              output: 'UI atualizada com a matriz lógica. Fórmulas avaliadas automaticamente para todas as combinações de entrada.'
             });
           } catch (err) {
             console.error('[LogicForge AI] Falha ao injetar tool result:', err);
