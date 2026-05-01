@@ -117,6 +117,60 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
     [simplificationResults]
   );
 
+  /**
+   * Projeção real do Karnaugh:
+   * Extrai dos implicantes quais variáveis SÃO ativas (mask[i] !== '-' em pelo menos 1 implicante)
+   * e constroí a tabela verdade e variáveis apenas para essas.
+   * Resultado honesto: se QM reduziu 8 vars para 3, o mapa é 3-variável.
+   */
+  const karnaughProjection = useMemo(() => {
+    const implicants = activeSimplification?.result?.implicants || [];
+    const fullValues = outputs[activeOutputIndex]?.values || [];
+    const numVars = variables.length;
+
+    if (implicants.length === 0 || numVars === 0) {
+      return { activeIndices: [], activeVarNames: [], projectedValues: [], projectedGroups: [] };
+    }
+
+    // Descobrir quais posições (0-indexed) são ativas em pelo menos 1 implicante
+    const activeSet = new Set<number>();
+    for (const imp of implicants) {
+      for (let i = 0; i < imp.mask.length; i++) {
+        if (imp.mask[i] !== '-') activeSet.add(i);
+      }
+    }
+
+    const activeIndices = Array.from(activeSet).sort((a, b) => a - b);
+    const activeVarNames = activeIndices.map(i => variables[i]?.name || `x${i}`);
+    const n = activeIndices.length;
+
+    if (n === 0 || n > 4) {
+      // 0 ativas = constante; >4 = não cabe no mapa 2D
+      return { activeIndices, activeVarNames, projectedValues: fullValues, projectedGroups: [] };
+    }
+
+    // Construir valores projetados: para cada combinação das vars ativas,
+    // o valor é 1 se QUALQUER linha da tabela completa com essas vars valendo aquela
+    // combinação retorna 1 (OR projection - correto para funções que não dependem das vars inativas)
+    const totalRows = Math.pow(2, numVars);
+    const projSize = Math.pow(2, n);
+    const projected: (0 | 1)[] = new Array(projSize).fill(0);
+
+    for (let row = 0; row < totalRows; row++) {
+      const val = fullValues[row];
+      if (val !== 1) continue;
+      // Extrair bits das vars ativas nessa linha
+      let projIdx = 0;
+      for (let bi = 0; bi < n; bi++) {
+        const bit = (row >> (numVars - 1 - activeIndices[bi])) & 1;
+        projIdx = (projIdx << 1) | bit;
+      }
+      projected[projIdx] = 1;
+    }
+
+    return { activeIndices, activeVarNames, projectedValues: projected, projectedGroups: activeSimplification?.groups || [] };
+  }, [activeSimplification, outputs, activeOutputIndex, variables]);
+
   /** Callback para alteração de valores na tabela verdade */
   function handleOutputChange(outputIndex: number, values: CellValue[]) {
     setOutputValues(outputIndex, values);
@@ -293,9 +347,14 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
               <h2 className="text-base font-bold text-foreground flex items-center gap-2">
                 <span className="w-1.5 h-5 rounded-full bg-accent inline-block" />
                 Mapa de Karnaugh
-                {variables.length > 4 && (
+                {karnaughProjection.activeVarNames.length > 0 && karnaughProjection.activeVarNames.length <= 4 && variables.length > karnaughProjection.activeVarNames.length && (
+                  <span className="ml-2 text-xs font-normal text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full">
+                    ✓ {variables.length} → {karnaughProjection.activeVarNames.length} variáveis
+                  </span>
+                )}
+                {karnaughProjection.activeIndices.length > 4 && (
                   <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
-                    ⚠️ Requer ≤4 variáveis
+                    ⚠️ {karnaughProjection.activeIndices.length} vars ativas — mapa 2D requer ≤4
                   </span>
                 )}
               </h2>
@@ -305,31 +364,38 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
             </button>
             {karnaughMounted && (
               <div className={karnaughOpen ? 'px-6 pb-6' : 'hidden'}>
-                {variables.length > 4 && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 mb-4">
-                    ⚠️ Mapa projetado com as <strong>4 primeiras variáveis</strong> ({variables.slice(0, 4).map(v => v.name).join(', ')}).
-                    As demais {variables.length - 4} variáveis não são visíveis no mapa 2D — use as expressões booleanas acima para a lógica completa.
+                {karnaughProjection.activeIndices.length === 0 ? (
+                  <p className="text-sm text-muted text-center py-6">
+                    Expressão constante — nenhuma variável ativa após simplificação.
                   </p>
+                ) : karnaughProjection.activeIndices.length > 4 ? (
+                  <div className="text-center py-8 space-y-2 text-muted">
+                    <p className="text-sm font-medium">
+                      Após simplificação: {karnaughProjection.activeIndices.length} variáveis ativas
+                      ({karnaughProjection.activeVarNames.join(', ')})
+                    </p>
+                    <p className="text-xs">
+                      Mapa de Karnaugh 2D suporta no máximo 4 variáveis.<br/>
+                      Use as expressões booleanas acima para a lógica completa.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {karnaughProjection.activeVarNames.length < variables.length && (
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg px-3 py-2 mb-4">
+                        ✓ Mapa real com <strong>{karnaughProjection.activeVarNames.length} variáveis ativas</strong>: {karnaughProjection.activeVarNames.join(', ')}.
+                        As outras {variables.length - karnaughProjection.activeVarNames.length} variáveis foram eliminadas pela simplificação booleana.
+                      </p>
+                    )}
+                    <KarnaughMap
+                      numVars={karnaughProjection.activeVarNames.length}
+                      varNames={karnaughProjection.activeVarNames}
+                      values={karnaughProjection.projectedValues as import('@/lib/engine/types').CellValue[]}
+                      groups={variables.length <= 4 ? (activeSimplification?.groups || []) : []}
+                      outputName={outputs[activeOutputIndex]?.name || ''}
+                    />
+                  </>
                 )}
-                <KarnaughMap
-                  numVars={Math.min(4, variables.length)}
-                  varNames={varNames.slice(0, 4)}
-                  values={(() => {
-                    // Para >4 vars: projeta colapsando as linhas onde as vars extras = 0
-                    // (equivale a fixar as vars adicionais em 0 e ver o mapa das 4 primeiras)
-                    if (variables.length <= 4) return outputs[activeOutputIndex]?.values || [];
-                    const full = outputs[activeOutputIndex]?.values || [];
-                    const n4 = Math.pow(2, 4); // 16 cells
-                    const projected = new Array(n4).fill(0);
-                    for (let i = 0; i < n4; i++) {
-                      // idx no array completo onde as vars extras (>4) são 0
-                      projected[i] = full[i] ?? 0;
-                    }
-                    return projected;
-                  })()}
-                  groups={variables.length <= 4 ? (activeSimplification?.groups || []) : []}
-                  outputName={outputs[activeOutputIndex]?.name || ''}
-                />
               </div>
             )}
           </section>
