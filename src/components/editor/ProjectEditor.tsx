@@ -293,8 +293,7 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
                 ∨
               </span>
             </button>
-            {karnaughOpen && (
-              <div className="px-6 pb-6">
+            <div className={karnaughOpen ? 'px-6 pb-6' : 'hidden'}>
                 {variables.length > 4 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center text-muted gap-2">
                     <svg className="h-10 w-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -314,7 +313,6 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
                   />
                 )}
               </div>
-            )}
           </section>
 
           {/* Abas de saída (só quando múltiplas) */}
@@ -343,16 +341,14 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
                 ∨
               </span>
             </button>
-            {truthTableOpen && (
-              <div className="px-6 pb-6">
-                <TruthTable
-                  variables={variables}
-                  outputs={outputs}
-                  ordering={ordering}
-                  onOutputChange={handleOutputChange}
-                />
-              </div>
-            )}
+            <div className={truthTableOpen ? 'px-6 pb-6' : 'hidden'}>
+              <TruthTable
+                variables={variables}
+                outputs={outputs}
+                ordering={ordering}
+                onOutputChange={handleOutputChange}
+              />
+            </div>
           </section>
 
           {/* Exportação */}
