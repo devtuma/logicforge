@@ -305,24 +305,31 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
             </button>
             {karnaughMounted && (
               <div className={karnaughOpen ? 'px-6 pb-6' : 'hidden'}>
-                {variables.length > 4 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center text-muted gap-2">
-                    <svg className="h-10 w-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                    </svg>
-                    <p className="text-sm">
-                      Karnaugh requer no máximo 4 variáveis. Com {variables.length} variáveis há {Math.pow(2, variables.length).toLocaleString()} combinações.
-                    </p>
-                  </div>
-                ) : (
-                  <KarnaughMap
-                    numVars={variables.length}
-                    varNames={varNames}
-                    values={outputs[activeOutputIndex]?.values || []}
-                    groups={activeSimplification?.groups || []}
-                    outputName={outputs[activeOutputIndex]?.name || ''}
-                  />
+                {variables.length > 4 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 mb-4">
+                    ⚠️ Mapa projetado com as <strong>4 primeiras variáveis</strong> ({variables.slice(0, 4).map(v => v.name).join(', ')}).
+                    As demais {variables.length - 4} variáveis não são visíveis no mapa 2D — use as expressões booleanas acima para a lógica completa.
+                  </p>
                 )}
+                <KarnaughMap
+                  numVars={Math.min(4, variables.length)}
+                  varNames={varNames.slice(0, 4)}
+                  values={(() => {
+                    // Para >4 vars: projeta colapsando as linhas onde as vars extras = 0
+                    // (equivale a fixar as vars adicionais em 0 e ver o mapa das 4 primeiras)
+                    if (variables.length <= 4) return outputs[activeOutputIndex]?.values || [];
+                    const full = outputs[activeOutputIndex]?.values || [];
+                    const n4 = Math.pow(2, 4); // 16 cells
+                    const projected = new Array(n4).fill(0);
+                    for (let i = 0; i < n4; i++) {
+                      // idx no array completo onde as vars extras (>4) são 0
+                      projected[i] = full[i] ?? 0;
+                    }
+                    return projected;
+                  })()}
+                  groups={variables.length <= 4 ? (activeSimplification?.groups || []) : []}
+                  outputName={outputs[activeOutputIndex]?.name || ''}
+                />
               </div>
             )}
           </section>
