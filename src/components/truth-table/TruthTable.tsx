@@ -3,7 +3,7 @@
 // Componente principal da tabela verdade
 // Gera todas as 2^n linhas, exibe colunas de variáveis e saídas clicáveis
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { Variable, OutputConfig, CellValue } from '@/lib/engine/types';
 import { generateTruthTable, getMintermIndex } from '@/lib/engine/truth-table';
@@ -18,6 +18,8 @@ export interface TruthTableProps {
   onOutputChange: (outputIndex: number, values: CellValue[]) => void;
 }
 
+const PAGE_SIZE = 64; // linhas por página para tabelas grandes
+
 export function TruthTable({
   variables,
   outputs,
@@ -25,12 +27,20 @@ export function TruthTable({
   onOutputChange,
 }: TruthTableProps) {
   const numVars = variables.length;
+  const [page, setPage] = useState(0);
 
   /** Gera todas as combinações da tabela */
   const rows = useMemo(
     () => generateTruthTable(numVars, ordering),
     [numVars, ordering]
   );
+
+  // Paginação: só aplica quando muitas linhas (>4 vars)
+  const usePagination = rows.length > 16;
+  const totalPages = usePagination ? Math.ceil(rows.length / PAGE_SIZE) : 1;
+  const visibleRows = usePagination
+    ? rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+    : rows;
 
   /** Marca todos os valores de uma saída como 1 */
   function handleMarkAll(outputIndex: number) {
@@ -58,13 +68,34 @@ export function TruthTable({
   }
 
   return (
-    <div className="flex flex-col w-full">
+    <div className="flex flex-col w-full gap-3">
       <ExpressionInput 
         variables={variables} 
         outputs={outputs} 
         ordering={ordering} 
         onApply={onOutputChange} 
       />
+      
+      {/* Controles de paginação (topo) */}
+      {usePagination && (
+        <div className="flex items-center justify-between text-sm text-muted px-1">
+          <span>
+            Linhas {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, rows.length)} de {rows.length.toLocaleString()}
+          </span>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>
+              ← Anterior
+            </Button>
+            <span className="px-2 py-1 text-xs font-mono bg-surface-hover rounded">
+              {page + 1}/{totalPages}
+            </span>
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}>
+              Próxima →
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="w-full overflow-x-auto">
       <table className="min-w-full border-collapse">
         <thead>
@@ -126,7 +157,8 @@ export function TruthTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, rowIndex) => {
+          {visibleRows.map((row, localIndex) => {
+            const rowIndex = usePagination ? page * PAGE_SIZE + localIndex : localIndex;
             const mintermIndex = getMintermIndex(row, ordering, numVars);
             return (
               <tr
@@ -176,6 +208,27 @@ export function TruthTable({
         </tbody>
       </table>
     </div>
+
+    {/* Controles de paginação (rodapé) */}
+    {usePagination && (
+        <div className="flex items-center justify-center gap-2 pt-1">
+          <Button variant="secondary" size="sm" onClick={() => setPage(0)} disabled={page === 0}>
+            « Início
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>
+            ← Anterior
+          </Button>
+          <span className="text-xs text-muted font-mono px-2">
+            Pág. {page + 1} de {totalPages}
+          </span>
+          <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}>
+            Próxima →
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setPage(totalPages - 1)} disabled={page === totalPages - 1}>
+            Fim »
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

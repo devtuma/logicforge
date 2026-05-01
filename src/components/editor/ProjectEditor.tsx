@@ -31,7 +31,9 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
   const [diagramMode, setDiagramMode] = useState<'ladder' | 'fbd'>('ladder');
   const [inputTab, setInputTab] = useState<'ai' | 'st' | 'manual'>('ai');
   const [karnaughOpen, setKarnaughOpen] = useState(true);
+  const [karnaughMounted, setKarnaughMounted] = useState(true);
   const [truthTableOpen, setTruthTableOpen] = useState(true);
+  const [truthTableMounted, setTruthTableMounted] = useState(true);
   
   const {
     variables,
@@ -76,9 +78,13 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
     setVariables(newVars);
     setOutputs(newOuts);
     setTableGenerated(true);
-    // Para muitas variáveis, colapsar a tabela verdade por padrão (ocupa muito espaço)
-    setTruthTableOpen(newVars.length <= 4);
-    // Sincronizar aba ativa com a primeira saída gerada
+    const isLarge = newVars.length > 4;
+    // Para muitas variáveis: colapsar tabela verdade (muito pesada)
+    // e usar lazy-once: desmontar para não renderizar até o usuário pedir
+    setTruthTableOpen(!isLarge);
+    setTruthTableMounted(!isLarge); // não monta até o usuário abrir
+    setKarnaughOpen(true);
+    setKarnaughMounted(true);
     if (newOuts.length > 0) {
       setActiveOutputTab(newOuts[0].name);
     }
@@ -274,10 +280,14 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
             )}
           </section>
 
-          {/* Mapa de Karnaugh — sempre visível, mensagem inline para >4 vars */}
+          {/* Mapa de Karnaugh -- lazy-once: monta na primeira abertura, depois CSS hidden */}
           <section className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
             <button
-              onClick={() => setKarnaughOpen(o => !o)}
+              onClick={() => {
+                const next = !karnaughOpen;
+                setKarnaughOpen(next);
+                if (next) setKarnaughMounted(true); // monta na primeira vez
+              }}
               className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-surface-hover transition-colors"
             >
               <h2 className="text-base font-bold text-foreground flex items-center gap-2">
@@ -293,7 +303,8 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
                 ∨
               </span>
             </button>
-            <div className={karnaughOpen ? 'px-6 pb-6' : 'hidden'}>
+            {karnaughMounted && (
+              <div className={karnaughOpen ? 'px-6 pb-6' : 'hidden'}>
                 {variables.length > 4 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center text-muted gap-2">
                     <svg className="h-10 w-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -313,6 +324,7 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
                   />
                 )}
               </div>
+            )}
           </section>
 
           {/* Abas de saída (só quando múltiplas) */}
@@ -324,10 +336,14 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
             />
           )}
 
-          {/* Tabela Verdade — gaveta colapsável (auto-fecha para muitas variáveis) */}
+          {/* Tabela Verdade -- lazy-once: monta na primeira abertura, depois CSS hidden */}
           <section className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
             <button
-              onClick={() => setTruthTableOpen(o => !o)}
+              onClick={() => {
+                const next = !truthTableOpen;
+                setTruthTableOpen(next);
+                if (next) setTruthTableMounted(true); // monta na primeira vez
+              }}
               className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-surface-hover transition-colors"
             >
               <h2 className="text-base font-bold text-foreground flex items-center gap-2">
@@ -341,14 +357,16 @@ export function ProjectEditor({ initialData }: ProjectEditorProps) {
                 ∨
               </span>
             </button>
-            <div className={truthTableOpen ? 'px-6 pb-6' : 'hidden'}>
-              <TruthTable
-                variables={variables}
-                outputs={outputs}
-                ordering={ordering}
-                onOutputChange={handleOutputChange}
-              />
-            </div>
+            {truthTableMounted && (
+              <div className={truthTableOpen ? 'px-6 pb-6' : 'hidden'}>
+                <TruthTable
+                  variables={variables}
+                  outputs={outputs}
+                  ordering={ordering}
+                  onOutputChange={handleOutputChange}
+                />
+              </div>
+            )}
           </section>
 
           {/* Exportação */}
